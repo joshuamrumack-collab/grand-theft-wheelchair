@@ -1,0 +1,2 @@
+Put the main menu theme here (mp3, ogg or wav). It plays on the title screen and loops.
+See the Suno prompts doc, section MAIN MENU THEME.

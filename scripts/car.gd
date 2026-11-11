@@ -149,5 +149,5 @@ func _hit_chairs(w) -> void:
 				v *= 0.3
 
 func set_night(on: bool) -> void:
-	headlight.visible = on
+	headlight.visible = on and GameState.quality != 3   # potato / browser: no per-car lights
 	headlight.light_energy = 2.0 if on else 0.0

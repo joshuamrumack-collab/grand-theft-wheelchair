@@ -23,7 +23,8 @@ var revolution: int = 0            # Ramp Revolution %
 var crates_smashed: Array = []
 const SAVE_PATH := "user://gtw_save.json"
 # settings (pause menu)
-var quality: int = 1                 # 0 low, 1 medium, 2 high, 3 potato (old school PCs)
+var is_web: bool = OS.has_feature("web") or "--web" in OS.get_cmdline_user_args()   # --web: test the browser settings on a PC
+var quality: int = 3 if is_web else 1   # 0 low, 1 medium, 2 high, 3 potato (old school PCs / browser)
 const QUALITY_NAMES := ["Low", "Medium", "High", "Potato (school PC)"]
 var fullscreen: bool = false
 # accessibility
@@ -142,7 +143,7 @@ func _joy_button(action: String, button: int) -> void:
 
 func save_game() -> void:
 	var data := {"cred": cred, "dex": dex.keys(), "owned": owned.keys(), "style": style, "stunts": stunts_done, "races_won": races_won, "story": story, "revolution": revolution, "crates": crates_smashed, "retro": retro,
-		"settings": {"quality": quality, "fullscreen": fullscreen, "assist": assist_steer, "one_switch": one_switch, "hud_scale": hud_scale,
+		"settings": {("quality_web" if is_web else "quality"): quality, "fullscreen": fullscreen, "assist": assist_steer, "one_switch": one_switch, "hud_scale": hud_scale,
 			"colorblind": colorblind, "speed": game_speed, "toggle_boost": settings_toggle_boost, "toggle_wheelie": settings_toggle_wheelie},
 		"look": look, "goals": goals, "goal_prog": goal_prog}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -174,7 +175,7 @@ func load_game() -> bool:
 	revolution = int(data.get("revolution", 0))
 	retro = bool(data.get("retro", false))
 	var sets: Dictionary = data.get("settings", {})
-	quality = int(sets.get("quality", quality))
+	quality = int(sets.get("quality_web" if is_web else "quality", quality))
 	fullscreen = bool(sets.get("fullscreen", fullscreen))
 	assist_steer = bool(sets.get("assist", assist_steer))
 	one_switch = bool(sets.get("one_switch", one_switch))

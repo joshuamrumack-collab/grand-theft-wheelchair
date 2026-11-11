@@ -71,6 +71,21 @@ func _ready() -> void:
 	city = City.new()
 	add_child(city)
 	city.build()
+	if GameState.is_web or GameState.quality == 3:
+		# small things (props, labels, birds, cars, chairs) stop drawing past 80 m; the fog hides the cut
+		get_tree().node_added.connect(_cull_small)
+		_cull_walk(self)
+		var skip := {}
+		for b in city.birds:
+			skip[b.n] = true
+		var t0 := Time.get_ticks_msec()
+		var keep := {city.lamp_mat: true}
+		for sm in city.shop_mats:
+			keep[sm] = true
+		if Models.rainbow_mat != null:
+			keep[Models.rainbow_mat] = true
+		var n: int = preload("res://scripts/batcher.gd").merge(city, skip, keep)
+		print("[batch] city merged into %d meshes in %d ms" % [n, Time.get_ticks_msec() - t0])
 	GameState.load_game()
 	_spawn_world()
 	rig = CameraRig.new()
@@ -177,6 +192,9 @@ func apply_quality() -> void:
 		_apply_potato()
 		return
 	var q: int = GameState.quality
+	headlight.visible = true
+	if neon_light != null:
+		neon_light.visible = true
 	env.ssao_enabled = q >= 1
 	env.ssao_radius = 1.4
 	env.ssao_intensity = 1.6
@@ -273,6 +291,12 @@ func _apply_potato() -> void:
 		l.visible = false
 	for st in city.steam:
 		st.emitting = false
+	if neon_light != null:
+		neon_light.visible = false
+	headlight.visible = false
+	for c in cars:
+		if is_instance_valid(c) and c.headlight != null:
+			c.headlight.visible = false
 
 func _apply_modern() -> void:
 	if GameState.quality == 3:
@@ -287,6 +311,9 @@ func _apply_modern() -> void:
 	env.fog_density = 0.0022
 	env.glow_enabled = true
 	var q: int = GameState.quality
+	headlight.visible = true
+	if neon_light != null:
+		neon_light.visible = true
 	env.ssao_enabled = q >= 1
 	env.ssao_radius = 1.4
 	env.ssao_intensity = 1.6
@@ -365,10 +392,11 @@ func _spawn_world() -> void:
 	for s in city.parked_spots:
 		spawn_chair(s.type, s.pos, s.yaw)
 	var potato: bool = GameState.quality == 3
-	for i in (7 if potato else 14):
+	var web: bool = GameState.is_web and potato       # the browser version runs on one CPU thread: keep the crowd small
+	for i in (5 if web else (7 if potato else 14)):
 		var p := city.sidewalk_point()
 		spawn_chair(GameState.CIVILIAN_TYPES.pick_random(), p.pos, p.yaw + PI / 2)
-	for i in (11 if potato else 22):
+	for i in (7 if web else (11 if potato else 22)):
 		var bl: Dictionary = city.blocks.pick_random()
 		var k := randi() % 4
 		var cn: Vector3 = city.corners(bl)[k]
@@ -721,6 +749,26 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("wheelie") and GameState.settings_toggle_wheelie:
 		wheelie_toggled = not wheelie_toggled
 
+var _perf_t: float = 0.0
+func _cull_walk(n: Node) -> void:
+	_cull_small(n)
+	for c in n.get_children():
+		_cull_walk(c)
+
+func _cull_small(n: Node) -> void:
+	if not n is GeometryInstance3D or str(n.name).begins_with("Batch"):
+		return
+	var gi: GeometryInstance3D = n
+	if gi.visibility_range_end > 0.0:
+		return
+	if not gi.is_inside_tree():
+		gi.ready.connect(_cull_small.bind(gi), CONNECT_ONE_SHOT)
+		return
+	var size := gi.get_aabb().size * gi.global_basis.get_scale()
+	if maxf(size.x, maxf(size.y, size.z)) > 12.0:
+		return          # ground, big buildings, mission beams stay visible from far away
+	gi.visibility_range_end = 45.0 if gi is Label3D else 80.0
+
 var menu_player: AudioStreamPlayer
 ## Title-screen theme: any mp3/ogg/wav in assets/audio/menu/ (see the Suno prompts doc). Fades out on PLAY.
 func _menu_music() -> void:
@@ -788,6 +836,14 @@ func _physics_process(dt: float) -> void:
 		prompt = _nearest_stealable()
 
 func _process(_dt: float) -> void:
+	if GameState.is_web:
+		_perf_t += _dt
+		if _perf_t > 3.0:
+			_perf_t = 0.0
+			print("[perf] fps=%d proc=%.1fms phys=%.1fms draws=%d objs=%d prims=%dk nodes=%d" % [Engine.get_frames_per_second(),
+				Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
+				Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
+				int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME) / 1000.0), Performance.get_monitor(Performance.OBJECT_NODE_COUNT)])
 	_day_night()
 	var p: Chair = GameState.player
 	if p != null:

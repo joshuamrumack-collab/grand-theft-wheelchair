@@ -132,7 +132,10 @@ static func chair(type: String) -> Node3D:
 		for wn in ["WheelL", "WheelR", "CasterL", "CasterR", "CasterBL", "CasterBR"]:
 			var w = root.find_child(wn, true, false)
 			if w != null:
-				wheels.append([w, 0.42 if t.get("big", false) else (0.3 if wn.begins_with("Wheel") else 0.075)])
+				var rad: float = 0.42 if t.get("big", false) else (0.3 if wn.begins_with("Wheel") else 0.075)
+				if w is MeshInstance3D and w.mesh != null:
+					rad = maxf(0.03, w.mesh.get_aabb().size.y * 0.5)     # real wheel size from the model
+				wheels.append([w, rad])
 		if root.find_child("Seat", true, false) == null:
 			var s := Node3D.new()
 			s.name = "Seat"

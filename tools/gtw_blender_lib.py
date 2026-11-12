@@ -1,7 +1,7 @@
 
 import bpy, bmesh, math, os
 from mathutils import Vector, Matrix
-ROOT = os.path.expanduser(r"E:\Godot\GrandTheftWheelchair\assets\models")
+ROOT = os.environ.get("GTW_MODELS", r"E:\Godot\GrandTheftWheelchair\assets\models")
 
 def g(x, y, z):
     # Godot (x right, y up, z back) -> Blender (x right, y forward, z up)
